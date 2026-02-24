@@ -1,0 +1,6 @@
+account_id,customer_name,date,transaction_id,transaction_type,merchant,category,amount,balance,city
+12345,John Doe,2026-01-05,T001,deposit,Employer Inc,Salary,3000,3000,New York
+12345,John Doe,2026-01-10,T002,withdrawal,Amazon,Shopping,-250,2750,New York
+12345,John Doe,2026-02-01,T003,withdrawal,Chase Mortgage,Housing,-1200,1550,New York
+67890,Jane Smith,2026-01-07,T004,deposit,Employer Inc,Salary,4000,4000,Chicago
+67890,Jane Smith,2026-02-15,T005,withdrawal,United Airlines,Travel,-800,3200,Chicago

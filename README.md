@@ -8,12 +8,12 @@ all within a **Streamlit dashboard**.
 
 ## Features
 
-- Upload CSV bank statements
-- RAG-based question answering on transactions
-- FAISS vector search for fast retrieval
-- Streamlit dashboard for interactive queries
-- Supports large datasets (future expansion: load balancing)
-- Visualizations of transactions (future enhancement)
+## Day 2 Enhancements
+
+- Hybrid retrieval (Exact match + FAISS semantic search)
+- Transaction ID and Account ID direct lookup
+- Spending summary analytics
+- Improved retrieval debugging
 
 ---
 
@@ -36,4 +36,5 @@ pip install -r requirements.txt
 streamlit run app/bank_rag_app.py
 
 #Debug the app
+
 streamlit run app/bank_rag_app.py --logger.level=debug

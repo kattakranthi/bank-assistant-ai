@@ -15,6 +15,13 @@ all within a **Streamlit dashboard**.
 - Spending summary analytics
 - Improved retrieval debugging
 
+## Day 2 Enhancements
+
+- Create a StreamLit Dashboard to upload the pdf file
+- PDF data is extracted 
+- PDF Extraction data is given to LLM as prompt
+- LLM Returns the Structured Data
+- The Structured Data is saved into Json.
 ---
 
 ## Getting Started
@@ -35,6 +42,10 @@ pip install -r requirements.txt
 #Run the app
 streamlit run app/bank_rag_app.py
 
+#Run the upload app
+streamlit run app/upload_bank_pdf_file.py
+
 #Debug the app
 
 streamlit run app/bank_rag_app.py --logger.level=debug
+

@@ -1,4 +1,3 @@
-import app
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -38,6 +37,30 @@ def get_embeddings_batch(texts, batch_size=50):
 
     return np.array(embeddings).astype("float32")
 
+# -------------------------------
+# Hybrid Search Function (Day 2)
+# -------------------------------
+def hybrid_search(user_query, index, stored_texts, k=5):
+    user_query_lower = user_query.lower()
+
+    # 1️⃣ Exact Match Search (Transaction ID, Account ID, Merchant)
+    exact_matches = [
+        text for text in stored_texts
+        if user_query_lower in text.lower()
+    ]
+
+    if exact_matches:
+        return exact_matches[:k], "exact"
+
+    # 2️⃣ Semantic Search (FAISS)
+    query_embedding = get_embeddings_batch([user_query])
+    faiss.normalize_L2(query_embedding)
+
+    distances, indices = index.search(query_embedding, k)
+
+    retrieved = [stored_texts[i] for i in indices[0]]
+
+    return retrieved, "semantic"
 
 # -------------------------------
 # Build FAISS Index
@@ -116,6 +139,9 @@ if uploaded_file:
     # -------------------------------
     # Chat Section
     # -------------------------------
+    # -------------------------------
+    # Chat Section (Enhanced)
+    # -------------------------------
     st.subheader("Ask a Question")
 
     if "chat_history" not in st.session_state:
@@ -124,35 +150,41 @@ if uploaded_file:
     user_query = st.text_input("Enter your question")
 
     if user_query:
-        # Embed query
-        query_embedding = get_embeddings_batch([user_query])
-        faiss.normalize_L2(query_embedding)
 
-        # Search
-        k = 5
-        distances, indices = index.search(query_embedding, k)
-
-        retrieved_texts = [stored_texts[i] for i in indices[0]]
+        # 🔎 Hybrid Retrieval
+        retrieved_texts, search_type = hybrid_search(user_query, index, stored_texts)
 
         context = "\n".join(retrieved_texts)
 
-        st.write("User Query:", retrieved_texts)
+        st.write(f"🔍 Search Type Used: {search_type}")
+        st.write("📄 Retrieved Context:")
+        st.write(retrieved_texts)
 
+        # 📊 Simple Analytics Feature
+        if "total spending" in user_query.lower():
+            total_spending = df[df["amount"] < 0]["amount"].sum()
+            st.write(f"💰 Total Spending: {total_spending}")
 
+        if "spending by category" in user_query.lower():
+            category_summary = df.groupby("category")["amount"].sum()
+            st.write("📊 Spending by Category:")
+            st.write(category_summary)
+
+        # 🧠 LLM Prompt
         prompt = f"""
-You are a bank assistant. Answer the question using ONLY the context below.
+    You are a bank assistant. Answer ONLY using the context below.
 
-Context:
-{context}
+    Context:
+    {context}
 
-Question:
-{user_query}
-"""
+    Question:
+    {user_query}
+    """
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful bank assistant."},
+                {"role": "system", "content": "You are a financial assistant."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0
@@ -163,12 +195,13 @@ Question:
         st.session_state.chat_history.append(("User", user_query))
         st.session_state.chat_history.append(("Assistant", answer))
 
-    # Display chat history
+    # Display chat
     for role, message in st.session_state.chat_history:
         if role == "User":
             st.markdown(f"**🧑 {message}**")
         else:
             st.markdown(f"**🤖 {message}**")
+
 
 else:
     st.info("Upload a CSV file to start.")

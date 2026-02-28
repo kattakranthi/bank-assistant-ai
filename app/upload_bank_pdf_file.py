@@ -4,24 +4,40 @@ import os
 import fitz  # PyMuPDF
 import faiss
 import numpy as np
-from openai import OpenAI
 from dotenv import load_dotenv
+import asyncio
+import time
+
+from openai import AsyncOpenAI
+
+# -------------------------
+# Setup
+# -------------------------
 
 load_dotenv()
-client = OpenAI()
+client = AsyncOpenAI()
 
 PDF_JSON_FOLDER = "documents"
 os.makedirs(PDF_JSON_FOLDER, exist_ok=True)
+
+
+# -------------------------
+# PDF TEXT EXTRACTION
+# -------------------------
 
 def extract_text_from_pdf(uploaded_pdf):
     doc = fitz.open(stream=uploaded_pdf.read(), filetype="pdf")
     full_text = ""
     for page in doc:
         full_text += page.get_text()
-    print(full_text)
     return full_text
 
-def extract_structured_data(pdf_text):
+
+# -------------------------
+# LLM STRUCTURED EXTRACTION
+# -------------------------
+
+async def extract_structured_data(pdf_text):
     prompt = f"""
     Extract the following fields from this bank statement.
 
@@ -30,15 +46,13 @@ def extract_structured_data(pdf_text):
         "account_number": "",
         "statement_date": "",
         "total_balance": ""
-        
     }}
 
     Document:
     {pdf_text}
     """
-    print("pdf data ",pdf_text)
-    print("prompt ", prompt)
-    response = client.chat.completions.create(
+
+    response = await client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You extract structured banking data."},
@@ -57,7 +71,8 @@ def extract_structured_data(pdf_text):
                     },
                     "required": ["account_number", "statement_date", "total_balance"]
                 }
-            }},
+            }
+        },
         temperature=0
     )
 
@@ -69,6 +84,11 @@ def extract_structured_data(pdf_text):
         st.error("Failed to parse JSON from LLM.")
         return None
 
+
+# -------------------------
+# SAVE JSON
+# -------------------------
+
 def save_json(data):
     account = data.get("account_number", "unknown")
     date = data.get("statement_date", "unknown")
@@ -79,31 +99,48 @@ def save_json(data):
 
     return filename
 
-def chunk_text(text, chunk_size=800):
-    chunks = []
-    for i in range(0, len(text), chunk_size):
-        chunks.append(text[i:i+chunk_size])
-    return chunks
 
-def get_embeddings_batch(texts):
-    response = client.embeddings.create(
+# -------------------------
+# TEXT CHUNKING
+# -------------------------
+
+def chunk_text(text, chunk_size=800):
+    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
+
+# -------------------------
+# EMBEDDINGS (ASYNC)
+# -------------------------
+
+async def get_embeddings_batch(text_chunks):
+    response = await client.embeddings.create(
         model="text-embedding-3-small",
-        input=texts
+        input=text_chunks
     )
+
     embeddings = [e.embedding for e in response.data]
     return np.array(embeddings).astype("float32")
 
 
-def build_faiss_index(text_chunks):
-    embeddings = get_embeddings_batch(text_chunks)
+# -------------------------
+# FAISS INDEX BUILD (ASYNC)
+# -------------------------
+
+async def build_faiss_index(text_chunks):
+    embeddings = await get_embeddings_batch(text_chunks)
 
     faiss.normalize_L2(embeddings)
-    dim = embeddings.shape[1]
 
+    dim = embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
 
     return index
+
+
+# -------------------------
+# STREAMLIT UI
+# -------------------------
 
 st.subheader("Upload Bank PDF")
 
@@ -113,11 +150,18 @@ if uploaded_pdf:
 
     st.info("Extracting text from PDF...")
     pdf_text = extract_text_from_pdf(uploaded_pdf)
-
     st.success("Text extracted.")
 
+    # -------------------------
+    # LLM Extraction
+    # -------------------------
     st.info("Extracting structured data using AI...")
-    structured_data = extract_structured_data(pdf_text)
+    start = time.time()
+
+    structured_data = asyncio.run(extract_structured_data(pdf_text))
+
+    end = time.time()
+    st.write(f"LLM extraction latency: {end - start:.2f} seconds")
 
     if structured_data:
         st.json(structured_data)
@@ -125,9 +169,13 @@ if uploaded_pdf:
         json_file = save_json(structured_data)
         st.success(f"Saved structured JSON to {json_file}")
 
+        # -------------------------
+        # RAG FAISS INDEX
+        # -------------------------
         st.info("Creating embeddings for RAG...")
 
         chunks = chunk_text(pdf_text)
-        index = build_faiss_index(chunks)
+
+        index = asyncio.run(build_faiss_index(chunks))
 
         st.success("FAISS index built for this document.")

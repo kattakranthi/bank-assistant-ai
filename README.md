@@ -23,6 +23,9 @@ all within a **Streamlit dashboard**.
 - LLM Returns the Structured Data
 - The Structured Data is saved into Json.
 ---
+## Day 3 Enhancements
+
+- Refactor OpenAI integration to use AsyncOpenAI with proper await handling
 
 ## Getting Started
 
@@ -48,4 +51,5 @@ streamlit run app/upload_bank_pdf_file.py
 #Debug the app
 
 streamlit run app/bank_rag_app.py --logger.level=debug
+
 
